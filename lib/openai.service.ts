@@ -7,18 +7,20 @@ if (!OPENAI_API_KEY) {
   Deno.exit(1);
 }
 
-// Define a recursive type for form fields
-type FormField = {
-  name: string;
-  type: string;
-  subfields?: FormField[];
-};
+/**
+ * Parse image of form to JSON using OpenAI's API
+ */
+function parseForm(base64Image: string){
 
-// Define the form schema type
-type FormSchema = {
-  name: string;
-  fields: FormField[];
-};
+}
+
+// TODO:
+
+/**
+ * "Interaction loop": repeatedly prompting the model and passing in the user's 
+ * response until the form is complete.
+ */
+  
 
 const RESPONSE_SCHEMA = {
   type: "json_schema",
