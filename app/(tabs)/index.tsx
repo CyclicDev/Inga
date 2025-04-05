@@ -37,6 +37,16 @@ export default function HomeScreen() {
         </ThemedText>
       </TouchableOpacity>
 
+      <TouchableOpacity 
+        style={styles.homeScreenButton} 
+        onPress={() => router.push('/HomeScreen')}
+        activeOpacity={0.8}
+      >
+        <ThemedText style={styles.homeScreenButtonText}>
+          Go to Home Screen
+        </ThemedText>
+      </TouchableOpacity>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
@@ -102,6 +112,23 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   voiceChatButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  homeScreenButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginVertical: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  homeScreenButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 16,
