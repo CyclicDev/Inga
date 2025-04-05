@@ -5,9 +5,11 @@ import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
 import { ThemedText } from '@/components/ThemedText';
 import { ThemedView } from '@/components/ThemedView';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { signOut, user } = useAuth();
 
   const openVoiceChat = () => {
     router.push('/voice-chat' as any);
@@ -26,6 +28,12 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
         <HelloWave />
       </ThemedView>
+      
+      {user && (
+        <ThemedText style={styles.greeting}>
+          Hello, {user.email}
+        </ThemedText>
+      )}
       
       <TouchableOpacity 
         style={styles.voiceChatButton} 
@@ -68,6 +76,16 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
       </ThemedView>
+      
+      <TouchableOpacity 
+        style={styles.signOutButton} 
+        onPress={signOut}
+        activeOpacity={0.8}
+      >
+        <ThemedText style={styles.signOutText}>
+          Sign Out
+        </ThemedText>
+      </TouchableOpacity>
     </ParallaxScrollView>
   );
 }
@@ -77,6 +95,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  greeting: {
+    marginTop: 8,
+    marginBottom: 16,
+    fontSize: 16,
+    opacity: 0.8,
   },
   stepContainer: {
     gap: 8,
@@ -103,6 +127,17 @@ const styles = StyleSheet.create({
   },
   voiceChatButtonText: {
     color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  signOutButton: {
+    marginTop: 32,
+    padding: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(180, 180, 180, 0.2)',
+  },
+  signOutText: {
     fontWeight: '600',
     fontSize: 16,
   },
