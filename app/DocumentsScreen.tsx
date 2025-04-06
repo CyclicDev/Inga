@@ -5,23 +5,46 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { getDocuments, Document, deleteDocument } from '../lib/documents.service.ts';
 import { startDocumentChat } from '../lib/chat.service.ts';
-
-// Sample user ID - in a real app, you'd get this from authentication
-const SAMPLE_USER_ID = '12345';
+import { supabase } from '../lib/supabaseClient.ts';
 
 export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    loadDocuments();
+    // Get user and load documents
+    getUserAndLoadDocuments();
   }, []);
 
-  const loadDocuments = async () => {
+  const getUserAndLoadDocuments = async () => {
+    try {
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        // User not authenticated
+        Alert.alert('Authentication Required', 'Please sign in to view your documents');
+        router.replace('/auth/login'); // Assuming you have a login screen
+        return;
+      }
+      
+      // Store user ID for later use
+      setUserId(session.user.id);
+      
+      // Now load documents for this user
+      await loadDocuments(session.user.id);
+    } catch (error) {
+      console.error('Error getting authentication:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const loadDocuments = async (uid: string) => {
     try {
       setIsLoading(true);
-      const docs = await getDocuments(SAMPLE_USER_ID);
+      const docs = await getDocuments(uid);
       setDocuments(docs);
     } catch (error) {
       console.error('Error loading documents:', error);
@@ -32,10 +55,20 @@ export default function DocumentsScreen() {
   };
 
   const handleAddDocument = async () => {
+    if (!userId) {
+      Alert.alert('Authentication Required', 'Please sign in to add documents');
+      return;
+    }
+    
     router.push('/add-document');
   };
 
   const handleChatWithDocument = async (document: Document) => {
+    if (!userId) {
+      Alert.alert('Authentication Required', 'Please sign in to chat with documents');
+      return;
+    }
+    
     try {
       const chatSession = await startDocumentChat(document);
       router.push({
@@ -49,6 +82,11 @@ export default function DocumentsScreen() {
   };
 
   const handleDeleteDocument = async (document: Document) => {
+    if (!userId) {
+      Alert.alert('Authentication Required', 'Please sign in to delete documents');
+      return;
+    }
+    
     Alert.alert(
       'Delete Document',
       `Are you sure you want to delete "${document.name}"?`,
@@ -60,7 +98,7 @@ export default function DocumentsScreen() {
           onPress: async () => {
             try {
               setIsLoading(true);
-              const success = await deleteDocument(document.id, SAMPLE_USER_ID);
+              const success = await deleteDocument(document.id, userId);
               if (success) {
                 setDocuments(documents.filter(doc => doc.id !== document.id));
                 Alert.alert('Success', 'Document deleted successfully');
@@ -83,6 +121,19 @@ export default function DocumentsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#636ae8" />
+      </View>
+    );
+  }
+  
+  // Display authentication required message if not logged in
+  if (!userId) {
+    return (
+      <View style={styles.authRequiredContainer}>
+        <Ionicons name="lock-closed" size={64} color="#ccc" />
+        <Text style={styles.authRequiredText}>Authentication Required</Text>
+        <Text style={styles.authRequiredSubText}>
+          Please sign in to view and manage your documents
+        </Text>
       </View>
     );
   }
@@ -267,6 +318,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptyStateSubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    maxWidth: '80%',
+  },
+  authRequiredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  authRequiredText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#333',
+    marginTop: 16,
+  },
+  authRequiredSubText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',

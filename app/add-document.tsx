@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   View, 
@@ -15,15 +15,37 @@ import { Stack, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { createDocument } from '../lib/documents.service.ts';
-
-// Sample user ID - in a real app, you'd get this from authentication
-const SAMPLE_USER_ID = '12345';
+import { supabase } from '../lib/supabaseClient.ts';
 
 export default function AddDocumentScreen() {
   const [documentName, setDocumentName] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    // Get the current user when component mounts
+    fetchUser();
+  }, []);
+
+  const fetchUser = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        // Redirect to login if not authenticated
+        Alert.alert('Authentication Required', 'Please sign in to continue');
+        router.replace('/auth/login'); // Assuming you have a login screen
+        return;
+      }
+      
+      setUserId(session.user.id);
+    } catch (error) {
+      console.error('Error fetching user:', error);
+      Alert.alert('Error', 'Failed to authenticate user');
+    }
+  };
 
   const pickImages = async () => {
     try {
@@ -71,6 +93,11 @@ export default function AddDocumentScreen() {
   };
   
   const handleSave = async () => {
+    if (!userId) {
+      Alert.alert('Authentication Required', 'Please sign in to continue');
+      return;
+    }
+
     if (!documentName.trim()) {
       Alert.alert('Required', 'Please enter a document name');
       return;
@@ -84,7 +111,7 @@ export default function AddDocumentScreen() {
     try {
       setIsLoading(true);
       
-      const document = await createDocument(documentName, images, SAMPLE_USER_ID);
+      const document = await createDocument(documentName, images, userId);
       
       if (!document) {
         throw new Error('Failed to create document');
@@ -104,6 +131,9 @@ export default function AddDocumentScreen() {
     }
   };
 
+  // Disable the save button if not authenticated
+  const isSaveDisabled = !userId || !documentName.trim() || images.length === 0 || isLoading;
+
   return (
     <>
       <Stack.Screen 
@@ -118,59 +148,68 @@ export default function AddDocumentScreen() {
       />
       
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Document Name</Text>
-            <TextInput
-              style={styles.input}
-              value={documentName}
-              onChangeText={setDocumentName}
-              placeholder="Enter document name"
-              placeholderTextColor="#999"
-            />
+        {!userId ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#636ae8" />
+            <Text style={styles.loadingText}>Authenticating...</Text>
           </View>
-          
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Images</Text>
-            <TouchableOpacity style={styles.addImagesButton} onPress={pickImages}>
-              <Ionicons name="images-outline" size={24} color="#636ae8" />
-              <Text style={styles.addImagesButtonText}>Add Images</Text>
-            </TouchableOpacity>
-            
-            {images.length > 0 && (
-              <View style={styles.imageList}>
-                {images.map((uri, index) => (
-                  <View key={index} style={styles.imageContainer}>
-                    <Image source={{ uri }} style={styles.image} />
-                    <TouchableOpacity
-                      style={styles.removeImageButton}
-                      onPress={() => removeImage(index)}
-                    >
-                      <Ionicons name="close-circle" size={24} color="#ff6b6b" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
+        ) : (
+          <>
+            <ScrollView contentContainerStyle={styles.content}>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Document Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={documentName}
+                  onChangeText={setDocumentName}
+                  placeholder="Enter document name"
+                  placeholderTextColor="#999"
+                />
               </View>
-            )}
-          </View>
-        </ScrollView>
-        
-        <View style={styles.footer}>
-          <TouchableOpacity 
-            style={[styles.saveButton, (!documentName.trim() || images.length === 0) && styles.disabledButton]}
-            onPress={handleSave}
-            disabled={!documentName.trim() || images.length === 0 || isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" size="small" />
-            ) : (
-              <>
-                <Ionicons name="save-outline" size={20} color="white" />
-                <Text style={styles.saveButtonText}>Save Document</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+              
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Images</Text>
+                <TouchableOpacity style={styles.addImagesButton} onPress={pickImages}>
+                  <Ionicons name="images-outline" size={24} color="#636ae8" />
+                  <Text style={styles.addImagesButtonText}>Add Images</Text>
+                </TouchableOpacity>
+                
+                {images.length > 0 && (
+                  <View style={styles.imageList}>
+                    {images.map((uri, index) => (
+                      <View key={index} style={styles.imageContainer}>
+                        <Image source={{ uri }} style={styles.image} />
+                        <TouchableOpacity
+                          style={styles.removeImageButton}
+                          onPress={() => removeImage(index)}
+                        >
+                          <Ionicons name="close-circle" size={24} color="#ff6b6b" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+            
+            <View style={styles.footer}>
+              <TouchableOpacity 
+                style={[styles.saveButton, isSaveDisabled && styles.disabledButton]}
+                onPress={handleSave}
+                disabled={isSaveDisabled}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="save-outline" size={20} color="white" />
+                    <Text style={styles.saveButtonText}>Save Document</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
     </>
   );
@@ -264,5 +303,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginTop: 16,
   },
 }); 
