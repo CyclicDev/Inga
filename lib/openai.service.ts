@@ -1,4 +1,5 @@
-import fs from "fs";
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import * as fs from "fs";
 import OpenAI from "openai";
 import 'dotenv/config';
 
@@ -61,7 +62,53 @@ const parseForm = async () => {
   }
 };
 
+async function fillPdfForm(templatePdfPath: string, outputPdfPath: string, formData: Record<string, string>) {
+  const templatePdfBytes = fs.readFileSync(templatePdfPath);
+  const pdfDoc = await PDFDocument.load(templatePdfBytes);
+  const form = pdfDoc.getForm();
 
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  form.updateFieldAppearances(font);
+
+  for (const [fieldName, fieldValue] of Object.entries(formData)) {
+    const field = form.getFieldMaybe(fieldName); // or getField if you want it to throw
+    if (!field) {
+      console.warn(`Field "${fieldName}" not found in the form.`);
+      continue;
+    }
+
+    let value = fieldValue;
+
+    if (value.startsWith('AI:')) {
+      const prompt = value.substring(3);
+      try {
+        const response = await openai.completions.create({
+          model: 'text-davinci-003',
+          prompt,
+          max_tokens: 100,
+        });
+        value = response.choices[0].text.trim();
+      } catch (error) {
+        console.error(`OpenAI error for field "${fieldName}":`, error);
+        continue;
+      }
+    }
+
+    if (field.setText) {
+      field.setText(value);
+    } else {
+      console.warn(`Field "${fieldName}" is not a text field.`);
+    }
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  fs.writeFileSync(outputPdfPath, pdfBytes);
+}
+
+fillPdfForm('./lib/blank.pdf', './lib/filled.pdf', {
+  name: 'Mikey',
+  summary: 'AI:Give me a motivational quote.'
+});
 
 // // TODO:
 
