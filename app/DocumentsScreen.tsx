@@ -3,9 +3,10 @@ import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { getDocuments, Document, deleteDocument } from '../lib/documents.service.ts';
-import { startDocumentChat } from '../lib/chat.service.ts';
-import { supabase } from '../lib/supabaseClient.ts';
+import { getDocuments, Document, deleteDocument } from '../lib/documents.service';
+import { startDocumentChat } from '../lib/chat.service';
+import { supabase } from '../lib/supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function DocumentsScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -71,9 +72,23 @@ export default function DocumentsScreen() {
     
     try {
       const chatSession = await startDocumentChat(document);
+      
+      // Save chat session to AsyncStorage before navigating
+      try {
+        await AsyncStorage.setItem(`chat_${chatSession.id}`, JSON.stringify(chatSession));
+        console.log("Saved chat session to AsyncStorage:", chatSession.id);
+      } catch (storageError) {
+        console.error("AsyncStorage error:", storageError);
+        // Continue even if storage fails
+      }
+      
       router.push({
         pathname: '/chat/[id]',
-        params: { id: chatSession.id, isNew: 'true' }
+        params: { 
+          id: chatSession.id, 
+          isNew: 'true',
+          documentId: document.id 
+        }
       });
     } catch (error) {
       console.error('Error starting chat with document:', error);

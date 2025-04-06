@@ -8,7 +8,8 @@ import {
   FlatList, 
   KeyboardAvoidingView, 
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -23,7 +24,7 @@ export default function ChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const listRef = useRef<FlatList>(null);
   const router = useRouter();
-  const params = useLocalSearchParams<{ id: string; isNew?: string }>();
+  const params = useLocalSearchParams<{ id: string; isNew?: string; documentId?: string }>();
   
   useEffect(() => {
     loadChat();
@@ -36,38 +37,52 @@ export default function ChatScreen() {
       // Check if we need to create a new chat or load existing one
       if (params.isNew === 'true') {
         // This is a new chat, get chat session from AsyncStorage or create one
-        const storedSessionStr = await AsyncStorage.getItem(`chat_${params.id}`);
-        if (storedSessionStr) {
-          setChatSession(JSON.parse(storedSessionStr));
-        } else {
-          // Create new chat with document if document_id is in the chat session
-          const existingChat = await startDocumentChat();
-          setChatSession(existingChat);
-          // Save to AsyncStorage
-          await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(existingChat));
+        try {
+          const storedSessionStr = await AsyncStorage.getItem(`chat_${params.id}`);
+          if (storedSessionStr) {
+            setChatSession(JSON.parse(storedSessionStr));
+          } else {
+            // Create new chat with document if document_id is in the chat session
+            const existingChat = await startDocumentChat();
+            setChatSession(existingChat);
+            // Save to AsyncStorage
+            await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(existingChat));
+          }
+        } catch (storageError) {
+          console.error('AsyncStorage error:', storageError);
+          // Fallback to creating a new chat
+          const newChat = await startDocumentChat();
+          setChatSession(newChat);
         }
       } else {
         // Load existing chat from AsyncStorage
-        const storedSessionStr = await AsyncStorage.getItem(`chat_${params.id}`);
-        if (storedSessionStr) {
-          setChatSession(JSON.parse(storedSessionStr));
-        } else {
-          // If chat doesn't exist in AsyncStorage but has a document, load document and start chat
-          if (params.document_id) {
-            const document = await getDocumentById(params.document_id);
-            if (document) {
-              const newChat = await startDocumentChat(document);
+        try {
+          const storedSessionStr = await AsyncStorage.getItem(`chat_${params.id}`);
+          if (storedSessionStr) {
+            setChatSession(JSON.parse(storedSessionStr));
+          } else {
+            // If chat doesn't exist in AsyncStorage but has a document, load document and start chat
+            if (params.documentId) {
+              const document = await getDocumentById(params.documentId);
+              if (document) {
+                const newChat = await startDocumentChat(document);
+                setChatSession(newChat);
+                // Save to AsyncStorage
+                await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(newChat));
+              }
+            } else {
+              // Create empty chat
+              const newChat = await startDocumentChat();
               setChatSession(newChat);
               // Save to AsyncStorage
               await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(newChat));
             }
-          } else {
-            // Create empty chat
-            const newChat = await startDocumentChat();
-            setChatSession(newChat);
-            // Save to AsyncStorage
-            await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(newChat));
           }
+        } catch (storageError) {
+          console.error('AsyncStorage error:', storageError);
+          // Fallback to creating a new chat
+          const newChat = await startDocumentChat();
+          setChatSession(newChat);
         }
       }
     } catch (error) {
@@ -102,7 +117,11 @@ export default function ChatScreen() {
       setChatSession(responseSession);
       
       // Save updated chat to AsyncStorage
-      await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(responseSession));
+      try {
+        await AsyncStorage.setItem(`chat_${params.id}`, JSON.stringify(responseSession));
+      } catch (storageError) {
+        console.error('Error saving chat to AsyncStorage:', storageError);
+      }
       
       // Scroll to bottom
       setTimeout(() => {
@@ -148,11 +167,10 @@ export default function ChatScreen() {
           ),
         }} 
       />
-      
+      <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={100}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardAvoidingView}
       >
         {chatSession ? (
           <>
@@ -203,12 +221,20 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         )}
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
