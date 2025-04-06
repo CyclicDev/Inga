@@ -149,9 +149,10 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
       setIsRecording(true);
       
       // Send the initial message to start the conversation
+      // Using conversation.item.create with the required 'item' parameter
       const initialMessage = {
-        type: 'message',
-        message: {
+        type: 'conversation.item.create',
+        item: {
           role: 'user',
           content: `You are assisting the user with filling out the "${currentSection}" section of their medical intake form. Ask relevant questions to help gather this information. Be friendly and conversational, and speak briefly.`,
         }
@@ -167,15 +168,20 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
         console.log("Received:", data);
         
         // Handle different message types
-        if (data.type === 'message_start') {
+        if (data.type === 'session.update') {
+          if (data.status === 'generating') {
+            setChatState(ChatState.SPEAKING);
+          } else if (data.status === 'awaiting_input') {
+            setChatState(ChatState.LISTENING);
+          }
+        } else if (data.type === 'response.create') {
+          // Response started
           setChatState(ChatState.SPEAKING);
-        } else if (data.type === 'message_delta') {
-          // Handle message content update
-        } else if (data.type === 'message_stop') {
-          setChatState(ChatState.LISTENING);
-        } else if (data.type === 'audio') {
+        } else if (data.type === 'response.chunk') {
+          // Handle response chunks (transcript)
+        } else if (data.type === 'audio.chunk') {
           // Play audio
-          await playAudio(data.audio);
+          await playAudio(data);
         } else if (data.type === 'error') {
           console.error('WebSocket error:', data.error);
           setErrorMsg(data.error.message || 'An error occurred');
@@ -255,15 +261,20 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
               const audioArrayBuffer = await audioBlob.arrayBuffer();
               const audioBase64 = Buffer.from(audioArrayBuffer).toString('base64');
               
-              // Send the audio data to the WebSocket
+              // Send the audio data to the WebSocket using the correct event type
               if (ws.readyState === WebSocket.OPEN) {
+                // First append the audio buffer
                 ws.send(JSON.stringify({
-                  type: 'audio',
-                  audio: {
-                    format: 'mp4a',
-                    samples_rate: 44100,
-                    data: audioBase64
-                  }
+                  type: 'input_audio_buffer.append',
+                  data: audioBase64,
+                  encoding: 'base64',
+                  format: 'mp4a',
+                  sample_rate: 44100
+                }));
+                
+                // Then commit the audio buffer
+                ws.send(JSON.stringify({
+                  type: 'input_audio_buffer.commit'
                 }));
               }
               
@@ -365,7 +376,8 @@ export const VoiceChat: React.FC<VoiceChatProps> = ({
     setIsRecording(false);
     stopRecording();
     if (ws) {
-      ws.send(JSON.stringify({ type: 'audio_end' }));
+      // Clear the audio buffer instead of audio_end
+      ws.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
     }
     setChatState(ChatState.IDLE);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -594,4 +606,4 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 50,
   },
-}); 
+});
