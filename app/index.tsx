@@ -118,7 +118,7 @@ function HomeScreen() {
     <View style={styles.container}>
       {/* Logo */}
       <Image
-        source={require('../assets/images/Ingalogo.png')}
+        source={require('../assets/images/IngaLogo.png')}
         style={styles.logo}
       />
 
