@@ -5,4 +5,7 @@ module.exports = {
     supabaseUrl: process.env.SUPABASE_URL || '',
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY || '',
   },
-}; 
+  plugins: [
+    'expo-font', // Add the expo-font plugin here
+  ],
+};

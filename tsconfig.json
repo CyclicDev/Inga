@@ -6,7 +6,9 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "moduleResolution": "node16", // Added moduleResolution option
+    "module": "Node16" // Added module option to match moduleResolution
   },
   "include": [
     "**/*.ts",
