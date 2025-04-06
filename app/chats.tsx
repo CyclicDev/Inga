@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { startDocumentChat } from '../lib/chat.service.ts';
@@ -14,27 +14,48 @@ interface Chat {
   user_id: string;
 }
 
-// Sample user ID - in a real app, you would get this from authentication
-const SAMPLE_USER_ID = '12345';
-
 export default function ChatsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    fetchChats();
+    // Get the current user and fetch chats
+    getUserAndFetchChats();
   }, []);
 
-  const fetchChats = async () => {
+  const getUserAndFetchChats = async () => {
+    try {
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        // User not authenticated
+        Alert.alert('Authentication Required', 'Please sign in to view your chats');
+        router.replace('/auth/login'); // Assuming you have a login screen
+        return;
+      }
+      
+      // Store user ID for later use
+      setUserId(session.user.id);
+      
+      // Now fetch chats for this user
+      await fetchChats(session.user.id);
+    } catch (error) {
+      console.error('Error getting authentication:', error);
+      setIsLoading(false);
+    }
+  };
+
+  const fetchChats = async (uid: string) => {
     try {
       setIsLoading(true);
-      // Fetch chats from local storage or from a server
-      // For now, we'll simulate by getting them from Supabase
+      
       const { data, error } = await supabase
         .from('chats')
         .select('*')
-        .eq('user_id', SAMPLE_USER_ID)
+        .eq('user_id', uid)
         .order('updated_at', { ascending: false });
 
       if (error) {
@@ -44,12 +65,18 @@ export default function ChatsScreen() {
       setChats(data || []);
     } catch (error) {
       console.error('Error fetching chats:', error);
+      Alert.alert('Error', 'Failed to load your chats');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNewChat = async () => {
+    if (!userId) {
+      Alert.alert('Authentication Required', 'Please sign in to create a chat');
+      return;
+    }
+    
     // Create a new empty chat
     const newChat = await startDocumentChat();
     
@@ -71,6 +98,19 @@ export default function ChatsScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#636ae8" />
+      </View>
+    );
+  }
+
+  // Display authentication required message if not logged in
+  if (!userId) {
+    return (
+      <View style={styles.authRequiredContainer}>
+        <Ionicons name="lock-closed" size={64} color="#ccc" />
+        <Text style={styles.authRequiredText}>Authentication Required</Text>
+        <Text style={styles.authRequiredSubText}>
+          Please sign in to view and manage your chats
+        </Text>
       </View>
     );
   }
@@ -204,6 +244,25 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   emptyStateSubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    maxWidth: '80%',
+  },
+  authRequiredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  authRequiredText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#333',
+    marginTop: 16,
+  },
+  authRequiredSubText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
