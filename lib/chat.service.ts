@@ -1,10 +1,6 @@
-import OpenAI from 'openai';
 import { Document } from './documents.service.js';
+import { supabase } from './supabaseClient.ts';
 import Constants from 'expo-constants';
-
-// Initialize OpenAI client with API key
-const openaiApiKey = Constants.expoConfig?.extra?.openaiApiKey || '';
-const openai = new OpenAI({ apiKey: openaiApiKey });
 
 export interface Message {
   role: 'system' | 'user' | 'assistant';
@@ -56,7 +52,7 @@ export async function startDocumentChat(document?: Document): Promise<ChatSessio
   };
 }
 
-// Function to send a message to the OpenAI API and get a response
+// Function to send a message to OpenAI API through Supabase function
 export async function sendMessage(chatSession: ChatSession, userMessage: string): Promise<ChatSession> {
   try {
     // Add user message to the chat
@@ -68,16 +64,41 @@ export async function sendMessage(chatSession: ChatSession, userMessage: string)
       }
     ];
     
-    // Call OpenAI API with the updated messages
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o', // Use vision model that can understand images
-      messages: updatedMessages as any, // Type assertion for the mixed content types
-      max_tokens: 500,
-      temperature: 0.7,
+    // Check if any message contains images to determine which function to use
+    const hasImages = updatedMessages.some(msg => 
+      Array.isArray(msg.content) && 
+      msg.content.some(item => item.type === 'image_url')
+    );
+    
+    // Call the appropriate Supabase function based on content
+    const functionName = hasImages ? 'openai-vision' : 'openai-proxy';
+    
+    // Get the current session auth token
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.access_token) {
+      throw new Error('User is not authenticated. Please sign in to continue.');
+    }
+    
+    // Call OpenAI API through Supabase function with authentication
+    const { data, error } = await supabase.functions.invoke(functionName, {
+      body: {
+        messages: updatedMessages,
+        model: 'gpt-4o', // Vision model that can understand images
+        max_tokens: 500,
+        temperature: 0.7,
+      },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`
+      }
     });
     
+    if (error) {
+      throw new Error(`Error calling Supabase function: ${error.message}`);
+    }
+    
     // Get the assistant's response
-    const assistantMessage = completion.choices[0].message;
+    const assistantMessage = data.choices[0].message;
     
     // Add the assistant's response to the messages
     updatedMessages.push({
@@ -91,7 +112,7 @@ export async function sendMessage(chatSession: ChatSession, userMessage: string)
       messages: updatedMessages
     };
   } catch (error) {
-    console.error('Error sending message to OpenAI:', error);
+    console.error('Error sending message:', error);
     
     // Add an error message to the chat
     const errorMessage: Message = {
