@@ -133,6 +133,7 @@ export async function sendMessage(chatSession: ChatSession, userMessage: string)
     });
     
     if (error) {
+      console.error(`Complete error message: ${JSON.stringify(error)}`)
       throw new Error(`Error calling Supabase function: ${error.message}`);
     }
     

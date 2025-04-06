@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { getDocuments, Document, deleteDocument } from '../lib/documents.service';
 import { startDocumentChat } from '../lib/chat.service';
@@ -14,10 +15,13 @@ export default function DocumentsScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    // Get user and load documents
-    getUserAndLoadDocuments();
-  }, []);
+  // Replace useEffect with useFocusEffect to refresh on navigation
+  useFocusEffect(
+    useCallback(() => {
+      // Get user and load documents each time the screen comes into focus
+      getUserAndLoadDocuments();
+    }, [])
+  );
 
   const getUserAndLoadDocuments = async () => {
     try {
