@@ -2,7 +2,12 @@
 // https://deno.land/manual/getting_started/setup_your_environment
 // Setup type definitions for built-in Supabase Runtime APIs
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { supabase } from '../../../lib/supabase.ts'
+import { createClient } from 'jsr:@supabase/supabase-js'
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+);
 
 Deno.serve(async (req: Request) => {
   try {
