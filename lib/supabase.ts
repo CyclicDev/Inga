@@ -1,5 +1,5 @@
-import { createClient } from 'jsr:@supabase/supabase-js'
-import "https://deno.land/std@0.224.0/dotenv/load.ts";
+import { createClient } from '@supabase/supabase-js';
+
 
 // Create and export a base Supabase client
 export const supabase = createClient(

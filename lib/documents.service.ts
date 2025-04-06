@@ -1,4 +1,6 @@
 import { supabase } from './supabaseClient.ts';
+// Apparently this is a polyfill necessary to get uuid to work:
+import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
 // Interface for Document type
@@ -22,27 +24,27 @@ export async function createDocument(name: string, imageBase64Array: string[], u
       imageBase64Array.map(async (base64Image, index) => {
         const filePath = `${userId}/${documentId}/${index}.jpg`;
         
-        // Convert base64 to Blob
+        // Convert base64 string to Uint8Array
+        // This is more reliable for binary data upload
         const base64Data = base64Image.split(',')[1] || base64Image;
-        const byteCharacters = atob(base64Data);
-        const byteArrays = [];
+        const binaryString = atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
         
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteArrays.push(byteCharacters.charCodeAt(i));
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
         }
         
-        const byteArray = new Uint8Array(byteArrays);
-        const blob = new Blob([byteArray], { type: 'image/jpeg' });
-        
-        // Upload to Supabase storage
+        // Upload the binary data
         const { data, error } = await supabase.storage
           .from('documents')
-          .upload(filePath, blob, {
+          .upload(filePath, bytes.buffer, {
             contentType: 'image/jpeg',
             upsert: true
           });
         
         if (error) {
+          console.error('Storage error:', error);
           throw new Error(`Error uploading image: ${error.message}`);
         }
         
@@ -179,4 +181,4 @@ export async function deleteDocument(documentId: string, userId: string): Promis
     console.error('Error in deleteDocument:', error);
     return false;
   }
-} 
+}

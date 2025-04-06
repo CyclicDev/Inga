@@ -1,22 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { getDocuments, Document, deleteDocument } from '../lib/documents.service.ts';
-import { startDocumentChat } from '../lib/chat.service.ts';
-import { supabase } from '../lib/supabaseClient.ts';
+import { getDocuments, Document, deleteDocument } from '../lib/documents.service';
+import { startDocumentChat } from '../lib/chat.service';
+import { supabase } from '../lib/supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack } from 'expo-router';
 
 export default function DocumentsScreen() {
+  // Add Stack.Screen component for this screen's title
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    // Get user and load documents
-    getUserAndLoadDocuments();
-  }, []);
+  // Replace useEffect with useFocusEffect to refresh on navigation
+  useFocusEffect(
+    useCallback(() => {
+      // Get user and load documents each time the screen comes into focus
+      getUserAndLoadDocuments();
+    }, [])
+  );
 
   const getUserAndLoadDocuments = async () => {
     try {
@@ -71,9 +78,23 @@ export default function DocumentsScreen() {
     
     try {
       const chatSession = await startDocumentChat(document);
+      
+      // Save chat session to AsyncStorage before navigating
+      try {
+        await AsyncStorage.setItem(`chat_${chatSession.id}`, JSON.stringify(chatSession));
+        console.log("Saved chat session to AsyncStorage:", chatSession.id);
+      } catch (storageError) {
+        console.error("AsyncStorage error:", storageError);
+        // Continue even if storage fails
+      }
+      
       router.push({
         pathname: '/chat/[id]',
-        params: { id: chatSession.id, isNew: 'true' }
+        params: { 
+          id: chatSession.id, 
+          isNew: 'true',
+          documentId: document.id 
+        }
       });
     } catch (error) {
       console.error('Error starting chat with document:', error);
@@ -139,73 +160,80 @@ export default function DocumentsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>My Documents</Text>
+    <>
+      <Stack.Screen 
+        options={{
+          title: 'Documents',
+          headerLargeTitle: true,
+        }}
+      />
       
-      <TouchableOpacity style={styles.addButton} onPress={handleAddDocument}>
-        <Ionicons name="add-circle" size={24} color="white" />
-        <Text style={styles.addButtonText}>Add Document</Text>
-      </TouchableOpacity>
-      
-      {documents.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="document-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyStateText}>No documents yet</Text>
-          <Text style={styles.emptyStateSubText}>
-            Add your first document to get started
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={documents}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.documentItem}>
-              <TouchableOpacity 
-                style={styles.documentPreview}
-                onPress={() => router.push(`/document/${item.id}`)}
-              >
-                {item.images && item.images.length > 0 ? (
-                  <View style={styles.thumbnailContainer}>
-                    <Text style={styles.imageCount}>
-                      {item.images.length} {item.images.length === 1 ? 'image' : 'images'}
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddDocument}>
+          <Ionicons name="add-circle" size={24} color="white" />
+          <Text style={styles.addButtonText}>Add Document</Text>
+        </TouchableOpacity>
+        
+        {documents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No documents yet</Text>
+            <Text style={styles.emptyStateSubText}>
+              Add your first document to get started
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={documents}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.documentItem}>
+                <TouchableOpacity 
+                  style={styles.documentPreview}
+                  onPress={() => router.push(`/document/${item.id}`)}
+                >
+                  {item.images && item.images.length > 0 ? (
+                    <View style={styles.thumbnailContainer}>
+                      <Text style={styles.imageCount}>
+                        {item.images.length} {item.images.length === 1 ? 'image' : 'images'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.noThumbnail}>
+                      <Ionicons name="document" size={32} color="#ccc" />
+                    </View>
+                  )}
+                  <View style={styles.documentInfo}>
+                    <Text style={styles.documentName}>{item.name}</Text>
+                    <Text style={styles.documentDate}>
+                      {new Date(item.created_at).toLocaleDateString()}
                     </Text>
                   </View>
-                ) : (
-                  <View style={styles.noThumbnail}>
-                    <Ionicons name="document" size={32} color="#ccc" />
-                  </View>
-                )}
-                <View style={styles.documentInfo}>
-                  <Text style={styles.documentName}>{item.name}</Text>
-                  <Text style={styles.documentDate}>
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              
-              <View style={styles.documentActions}>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleChatWithDocument(item)}
-                >
-                  <Ionicons name="chatbubble" size={22} color="#636ae8" />
                 </TouchableOpacity>
                 
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleDeleteDocument(item)}
-                >
-                  <Ionicons name="trash-outline" size={22} color="#ff6b6b" />
-                </TouchableOpacity>
+                <View style={styles.documentActions}>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => handleChatWithDocument(item)}
+                  >
+                    <Ionicons name="chatbubble" size={22} color="#636ae8" />
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteDocument(item)}
+                  >
+                    <Ionicons name="trash-outline" size={22} color="#ff6b6b" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
-          contentContainerStyle={styles.documentsList}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
+            )}
+            contentContainerStyle={styles.documentsList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </>
   );
 }
 
