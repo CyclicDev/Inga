@@ -30,8 +30,8 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="HomeScreen" options={{ title: 'Home Screen' }} />
+        {/* Set HomeScreen as the default entry point */}
+        <Stack.Screen name="index" options={{ title: 'Home Screen', headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
       <StatusBar style="auto" />
