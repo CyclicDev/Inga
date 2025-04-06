@@ -8,8 +8,10 @@ import { getDocuments, Document, deleteDocument } from '../lib/documents.service
 import { startDocumentChat } from '../lib/chat.service';
 import { supabase } from '../lib/supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack } from 'expo-router';
 
 export default function DocumentsScreen() {
+  // Add Stack.Screen component for this screen's title
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -158,73 +160,80 @@ export default function DocumentsScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>My Documents</Text>
+    <>
+      <Stack.Screen 
+        options={{
+          title: 'Documents',
+          headerLargeTitle: true,
+        }}
+      />
       
-      <TouchableOpacity style={styles.addButton} onPress={handleAddDocument}>
-        <Ionicons name="add-circle" size={24} color="white" />
-        <Text style={styles.addButtonText}>Add Document</Text>
-      </TouchableOpacity>
-      
-      {documents.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="document-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyStateText}>No documents yet</Text>
-          <Text style={styles.emptyStateSubText}>
-            Add your first document to get started
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={documents}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.documentItem}>
-              <TouchableOpacity 
-                style={styles.documentPreview}
-                onPress={() => router.push(`/document/${item.id}`)}
-              >
-                {item.images && item.images.length > 0 ? (
-                  <View style={styles.thumbnailContainer}>
-                    <Text style={styles.imageCount}>
-                      {item.images.length} {item.images.length === 1 ? 'image' : 'images'}
+      <View style={styles.container}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddDocument}>
+          <Ionicons name="add-circle" size={24} color="white" />
+          <Text style={styles.addButtonText}>Add Document</Text>
+        </TouchableOpacity>
+        
+        {documents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyStateText}>No documents yet</Text>
+            <Text style={styles.emptyStateSubText}>
+              Add your first document to get started
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={documents}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.documentItem}>
+                <TouchableOpacity 
+                  style={styles.documentPreview}
+                  onPress={() => router.push(`/document/${item.id}`)}
+                >
+                  {item.images && item.images.length > 0 ? (
+                    <View style={styles.thumbnailContainer}>
+                      <Text style={styles.imageCount}>
+                        {item.images.length} {item.images.length === 1 ? 'image' : 'images'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.noThumbnail}>
+                      <Ionicons name="document" size={32} color="#ccc" />
+                    </View>
+                  )}
+                  <View style={styles.documentInfo}>
+                    <Text style={styles.documentName}>{item.name}</Text>
+                    <Text style={styles.documentDate}>
+                      {new Date(item.created_at).toLocaleDateString()}
                     </Text>
                   </View>
-                ) : (
-                  <View style={styles.noThumbnail}>
-                    <Ionicons name="document" size={32} color="#ccc" />
-                  </View>
-                )}
-                <View style={styles.documentInfo}>
-                  <Text style={styles.documentName}>{item.name}</Text>
-                  <Text style={styles.documentDate}>
-                    {new Date(item.created_at).toLocaleDateString()}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              
-              <View style={styles.documentActions}>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleChatWithDocument(item)}
-                >
-                  <Ionicons name="chatbubble" size={22} color="#636ae8" />
                 </TouchableOpacity>
                 
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => handleDeleteDocument(item)}
-                >
-                  <Ionicons name="trash-outline" size={22} color="#ff6b6b" />
-                </TouchableOpacity>
+                <View style={styles.documentActions}>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => handleChatWithDocument(item)}
+                  >
+                    <Ionicons name="chatbubble" size={22} color="#636ae8" />
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={() => handleDeleteDocument(item)}
+                  >
+                    <Ionicons name="trash-outline" size={22} color="#ff6b6b" />
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
-          contentContainerStyle={styles.documentsList}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </View>
+            )}
+            contentContainerStyle={styles.documentsList}
+            showsVerticalScrollIndicator={false}
+          />
+        )}
+      </View>
+    </>
   );
 }
 
