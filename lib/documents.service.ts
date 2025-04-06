@@ -1,4 +1,6 @@
 import { supabase } from './supabaseClient.ts';
+// Apparently this is a polyfill necessary to get uuid to work:
+import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 
 // Interface for Document type
@@ -22,24 +24,16 @@ export async function createDocument(name: string, imageBase64Array: string[], u
       imageBase64Array.map(async (base64Image, index) => {
         const filePath = `${userId}/${documentId}/${index}.jpg`;
         
-        // Convert base64 to Blob
+        // Ensure the base64 string is correctly formatted
         const base64Data = base64Image.split(',')[1] || base64Image;
-        const byteCharacters = atob(base64Data);
-        const byteArrays = [];
         
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteArrays.push(byteCharacters.charCodeAt(i));
-        }
-        
-        const byteArray = new Uint8Array(byteArrays);
-        const blob = new Blob([byteArray], { type: 'image/jpeg' });
-        
-        // Upload to Supabase storage
+        // Upload directly using base64 data without creating a Blob
         const { data, error } = await supabase.storage
           .from('documents')
-          .upload(filePath, blob, {
+          .upload(filePath, base64Data, {
             contentType: 'image/jpeg',
-            upsert: true
+            upsert: true,
+            encoding: 'base64'
           });
         
         if (error) {
@@ -179,4 +173,4 @@ export async function deleteDocument(documentId: string, userId: string): Promis
     console.error('Error in deleteDocument:', error);
     return false;
   }
-} 
+}

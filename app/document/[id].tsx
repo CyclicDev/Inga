@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { getDocumentById, Document } from '../../lib/documents.service.ts';
 import { startDocumentChat } from '../../lib/chat.service.ts';
+import { supabase } from '../../lib/supabaseClient.ts'; // Import Supabase client
 
 const { width } = Dimensions.get('window');
 
@@ -21,6 +22,7 @@ export default function DocumentDetailScreen() {
   const [document, setDocument] = useState<Document | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [signedImageUrls, setSignedImageUrls] = useState<string[]>([]);
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
 
@@ -34,6 +36,9 @@ export default function DocumentDetailScreen() {
       const doc = await getDocumentById(params.id);
       if (doc) {
         setDocument(doc);
+        if (doc.images && doc.images.length > 0) {
+          await generateSignedUrls(doc.images);
+        }
       } else {
         Alert.alert('Error', 'Document not found');
         router.back();
@@ -43,6 +48,55 @@ export default function DocumentDetailScreen() {
       Alert.alert('Error', 'Failed to load document');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateSignedUrls = async (imageUrls: string[]) => {
+    try {
+      const signedUrls = await Promise.all(
+        imageUrls.map(async (imageUrl) => {
+          // Check if this is a Supabase storage URL
+          if (imageUrl.includes('/storage/v1/object/public/')) {
+            try {
+              // Extract the path from the URL
+              // Format: https://[project].supabase.co/storage/v1/object/public/[bucket]/[path]
+              const urlObj = new URL(imageUrl);
+              const pathParts = urlObj.pathname.split('/storage/v1/object/public/');
+              
+              if (pathParts.length === 2) {
+                const bucketAndPath = pathParts[1];
+                // First segment is bucket name, rest is file path
+                const [bucket, ...pathSegments] = bucketAndPath.split('/');
+                const filePath = pathSegments.join('/');
+                
+                // Create a signed URL with 1 hour expiry
+                const { data, error } = await supabase.storage
+                  .from(bucket)
+                  .createSignedUrl(filePath, 60 * 60);
+                
+                if (error) {
+                  console.error('Error creating signed URL:', error);
+                  return imageUrl; // Fallback to original URL
+                }
+                
+                // Return the signed URL if successful, otherwise fall back to original URL
+                return data?.signedUrl || imageUrl;
+              }
+            } catch (error) {
+              console.error('Error creating signed URL:', error);
+            }
+          }
+          
+          // Return original URL if not a Supabase URL or if signing failed
+          return imageUrl;
+        })
+      );
+      
+      setSignedImageUrls(signedUrls);
+    } catch (error) {
+      console.error('Error generating signed URLs:', error);
+      // Fallback to original URLs
+      setSignedImageUrls(imageUrls);
     }
   };
 
@@ -103,7 +157,7 @@ export default function DocumentDetailScreen() {
           <>
             <View style={styles.mainImageContainer}>
               <Image 
-                source={{ uri: document.images[selectedImageIndex] }} 
+                source={{ uri: signedImageUrls[selectedImageIndex] || document.images[selectedImageIndex] }} 
                 style={styles.mainImage}
                 resizeMode="contain"
               />
@@ -121,7 +175,10 @@ export default function DocumentDetailScreen() {
                     ]}
                     onPress={() => setSelectedImageIndex(index)}
                   >
-                    <Image source={{ uri: item }} style={styles.thumbnail} />
+                    <Image 
+                      source={{ uri: signedImageUrls[index] || item }} 
+                      style={styles.thumbnail} 
+                    />
                   </TouchableOpacity>
                 )}
                 horizontal
@@ -243,4 +300,4 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
   },
-}); 
+});
