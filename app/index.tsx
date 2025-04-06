@@ -60,7 +60,7 @@ function HomeScreen() {
         const base64Image = await convertImageToBase64(result.assets[0].uri);
         if (base64Image) {
           const jsonPayload = createJsonPayload(base64Image);
-          console.log('JSON Payload:', jsonPayload);
+          // console.log('JSON Payload:', jsonPayload);
           Alert.alert('Success', 'Image processed and JSON created!');
         }
       } else {
@@ -80,7 +80,7 @@ function HomeScreen() {
     <View style={styles.container}>
       {/* Logo */}
       <Image
-        source={require('../assets/images/Ignalogo.png')}
+        source={require('../assets/images/IgnaLogo.png')}
         style={styles.logo}
       />
 
