@@ -24,19 +24,27 @@ export async function createDocument(name: string, imageBase64Array: string[], u
       imageBase64Array.map(async (base64Image, index) => {
         const filePath = `${userId}/${documentId}/${index}.jpg`;
         
-        // Ensure the base64 string is correctly formatted
+        // Convert base64 string to Uint8Array
+        // This is more reliable for binary data upload
         const base64Data = base64Image.split(',')[1] || base64Image;
+        const binaryString = atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
         
-        // Upload directly using base64 data without creating a Blob
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        // Upload the binary data
         const { data, error } = await supabase.storage
           .from('documents')
-          .upload(filePath, base64Data, {
+          .upload(filePath, bytes.buffer, {
             contentType: 'image/jpeg',
-            upsert: true,
-            encoding: 'base64'
+            upsert: true
           });
         
         if (error) {
+          console.error('Storage error:', error);
           throw new Error(`Error uploading image: ${error.message}`);
         }
         

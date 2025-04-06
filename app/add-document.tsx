@@ -16,6 +16,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { createDocument } from '../lib/documents.service.ts';
 import { supabase } from '../lib/supabaseClient.ts';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+
 
 export default function AddDocumentScreen() {
   const [documentName, setDocumentName] = useState('');
@@ -47,6 +49,28 @@ export default function AddDocumentScreen() {
     }
   };
 
+  // Function to convert any image to JPEG format using expo-image-manipulator
+  const convertToJpeg = async (uri: string): Promise<string> => {
+    try {
+      // Convert the image to JPEG format with slightly higher quality
+      const manipResult = await manipulateAsync(
+        uri,
+        [], // no manipulations
+        { format: SaveFormat.JPEG, compress: 0.9 } // convert to JPEG with better quality
+      );
+      
+      // Read the converted image as base64
+      const base64 = await FileSystem.readAsStringAsync(manipResult.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      return base64;
+    } catch (error) {
+      console.error('Error converting image to JPEG:', error);
+      throw error;
+    }
+  };
+
   const pickImages = async () => {
     try {
       // Request media library permissions
@@ -57,34 +81,40 @@ export default function AddDocumentScreen() {
         return;
       }
       
-      // Launch the image picker
+      // Launch the image picker with better quality
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
-        quality: 0.7,
-        base64: true,
+        quality: 1, // Use maximum quality
+        allowsEditing: false,
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        // Get the selected images as base64
-        const selectedImages = await Promise.all(
-          result.assets.map(async (asset) => {
-            // If base64 is not included in the result, read it manually
-            if (!asset.base64) {
-              const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-                encoding: FileSystem.EncodingType.Base64,
-              });
-              return `data:image/jpeg;base64,${base64}`;
-            }
-            return `data:image/jpeg;base64,${asset.base64}`;
-          })
-        );
+        setIsLoading(true); // Show loading indicator while processing images
         
-        setImages([...images, ...selectedImages]);
+        try {
+          // Process each selected image to JPEG
+          const processedImages = await Promise.all(
+            result.assets.map(async (asset) => {
+              // Convert any image to JPEG format
+              const base64 = await convertToJpeg(asset.uri);
+              // Return with proper JPEG MIME type
+              return `data:image/jpeg;base64,${base64}`;
+            })
+          );
+          
+          setImages([...images, ...processedImages]);
+        } catch (processError) {
+          console.error('Error processing images:', processError);
+          Alert.alert('Error', 'Failed to process selected images');
+        } finally {
+          setIsLoading(false);
+        }
       }
     } catch (error) {
       console.error('Error picking images:', error);
       Alert.alert('Error', 'Failed to pick images');
+      setIsLoading(false);
     }
   };
   
@@ -111,7 +141,14 @@ export default function AddDocumentScreen() {
     try {
       setIsLoading(true);
       
-      const document = await createDocument(documentName, images, userId);
+      // Extract the base64 data from the data URLs
+      const base64Images = images.map(image => {
+        const parts = image.split(',');
+        // Handle both formats: with prefix or without
+        return parts.length > 1 ? parts[1] : image;
+      });
+      
+      const document = await createDocument(documentName, base64Images, userId);
       
       if (!document) {
         throw new Error('Failed to create document');
