@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useFonts, Inter_400Regular } from '@expo-google-fonts/inter';
 import { Ionicons } from '@expo/vector-icons'; // Import Ionicons for icons
+import { BottomTabNavigationOptions } from '@react-navigation/bottom-tabs';
 
 const Tab = createBottomTabNavigator();
 
@@ -44,27 +45,64 @@ function HomeScreen() {
 
   const handleScanFile = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera access is required to scan documents.');
-        return;
-      }
+      const scannedImages: string[] = []; // Array to store Base64 strings of scanned images
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        const base64Image = await convertImageToBase64(result.assets[0].uri);
-        if (base64Image) {
-          const jsonPayload = createJsonPayload(base64Image);
-          console.log('JSON Payload:', jsonPayload);
-          Alert.alert('Success', 'Image processed and JSON created!');
+      const scanImage = async (): Promise<void> => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Permission Denied', 'Camera access is required to scan documents.');
+          return;
         }
+
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 1,
+        });
+
+        if (!result.canceled) {
+          const base64Image = await convertImageToBase64(result.assets[0].uri);
+          if (base64Image) {
+            scannedImages.push(base64Image); // Add the scanned image to the array
+          }
+
+          // Prompt the user to scan another image
+          return new Promise<void>((resolve) => {
+            Alert.alert(
+              'Scan Another?',
+              'Do you want to scan another image?',
+              [
+                { text: 'No', onPress: () => resolve() }, // Finish scanning
+                { text: 'Yes', onPress: async () => await scanImage().then(resolve) }, // Scan another image
+              ]
+            );
+          });
+        } else {
+          console.log('User canceled the scan');
+        }
+      };
+
+      await scanImage(); // Start the scanning process
+
+      // Ensure JSON payloads are created after all images are scanned
+      if (scannedImages.length > 0) {
+        const jsonPayloads = scannedImages.map((image, index) => ({
+          image,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            description: `Scanned document ${index + 1}`,
+            userId: '12345',
+          },
+        }));
+
+        // Log each JSON payload individually
+        jsonPayloads.forEach((payload, index) => {
+          //console.log(`Payload ${index + 1}:`, payload);
+        });
+
+        Alert.alert('Success', `${scannedImages.length} images processed and JSON payloads created!`);
       } else {
-        console.log('User canceled the scan');
+        console.log('No images were scanned.');
       }
     } catch (error) {
       console.error('Error during document scanning:', error);
@@ -121,12 +159,12 @@ function DocumentsScreen() {
 export default function App() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route }: { route: { name: string } }): BottomTabNavigationOptions => ({
         tabBarActiveTintColor: '#636ae8',
         tabBarInactiveTintColor: 'gray',
         tabBarStyle: { backgroundColor: '#FFFFFF' },
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => {
+          let iconName: 'home' | 'document-text' | undefined;
 
           if (route.name === 'Home') {
             iconName = 'home'; // Icon for Home tab
@@ -134,7 +172,7 @@ export default function App() {
             iconName = 'document-text'; // Icon for Documents tab
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <Ionicons name={iconName as 'home' | 'document-text'} size={size} color={color} />;
         },
       })}
     >
