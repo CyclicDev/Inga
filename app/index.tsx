@@ -6,6 +6,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useFonts, Inter_400Regular } from '@expo-google-fonts/inter';
 import { Ionicons } from '@expo/vector-icons'; // Import Ionicons for icons
+import DocumentsScreen from './DocumentsScreen.tsx'; // Import the Documents screen
+import ChatsScreen from './chats.tsx'; // Import the Chats screen
 
 const Tab = createBottomTabNavigator();
 
@@ -110,28 +112,22 @@ function HomeScreen() {
   );
 }
 
-function DocumentsScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.description}>This is the Documents Screen</Text>
-    </View>
-  );
-}
-
 export default function App() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={({ route }: { route: { name: string } }) => ({
         tabBarActiveTintColor: '#636ae8',
         tabBarInactiveTintColor: 'gray',
         tabBarStyle: { backgroundColor: '#FFFFFF' },
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
+        tabBarIcon: ({ color, size }: { color: string; size: number }) => {
+          let iconName: keyof typeof Ionicons.glyphMap | undefined;
 
           if (route.name === 'Home') {
             iconName = 'home'; // Icon for Home tab
           } else if (route.name === 'Documents') {
             iconName = 'document-text'; // Icon for Documents tab
+          } else if (route.name === 'Chats') {
+            iconName = 'chatbubbles'; // Icon for Chats tab
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -140,6 +136,7 @@ export default function App() {
     >
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Documents" component={DocumentsScreen} />
+      <Tab.Screen name="Chats" component={ChatsScreen} />
     </Tab.Navigator>
   );
 }
